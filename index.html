@@ -34,8 +34,23 @@
       font-size: 20px;
       letter-spacing: 1px;
       text-transform: uppercase;
-      margin-bottom: 16px;
+      margin-bottom: 6px;
       font-weight: 600;
+    }
+
+    .contact-line {
+      color: #c9d4e2;
+      font-size: 16px;
+      margin-bottom: 16px;
+    }
+
+    .contact-line a {
+      color: #5dade2;
+      text-decoration: none;
+    }
+
+    .contact-line a:hover {
+      text-decoration: underline;
     }
 
     .project-meta {
@@ -104,7 +119,35 @@
       border-radius: 10px;
       padding: 16px;
       margin-top: 20px;
-      overflow-x: auto;
+    }
+
+    .table-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .table-controls input,
+    .column-filter {
+      background: #05080d;
+      border: 1px solid #243447;
+      color: #f5f7fa;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-family: inherit;
+      font-size: 14px;
+    }
+
+    .table-controls input {
+      min-width: 280px;
+    }
+
+    .table-window {
+      max-height: 520px;
+      overflow: auto;
+      border: 1px solid #243447;
+      border-radius: 8px;
     }
 
     table {
@@ -130,7 +173,20 @@
       letter-spacing: 0.5px;
       position: sticky;
       top: 0;
+      z-index: 2;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    th:hover {
+      background: #16304d;
+    }
+
+    .filter-row th {
+      top: 43px;
+      background: #0b111a;
       z-index: 1;
+      cursor: default;
     }
 
     tr:nth-child(even) {
@@ -197,6 +253,14 @@
 
     <div class="byline">
       Jack Dermody
+    </div>
+
+    <div class="contact-line">
+      <a href="mailto:jackrdermody@gmail.com">jackrdermody@gmail.com</a>
+      |
+      <a href="https://www.linkedin.com/in/jrdermody/" target="_blank" rel="noopener noreferrer">
+        LinkedIn
+      </a>
     </div>
 
     <div class="project-meta">
@@ -296,8 +360,18 @@
         Player-level data loaded from <code>data/WEBSITE.csv</code>.
       </p>
 
-      <div id="player-table-container">
-        <p>Loading player table...</p>
+      <div class="table-controls">
+        <input
+          type="text"
+          id="player-table-search"
+          placeholder="Search all player table fields..."
+        />
+      </div>
+
+      <div class="table-window">
+        <div id="player-table-container">
+          <p>Loading player table...</p>
+        </div>
       </div>
     </div>
 
@@ -429,6 +503,12 @@ db["Team_End_Season"] = db["Team_End_Season"].replace({"ARI": "UTA"})</code></pr
   </footer>
 
   <script>
+    var playerTableRows = [];
+    var filteredRows = [];
+    var sortColumnIndex = null;
+    var sortDirection = "asc";
+    var columnFilters = {};
+
     function parseCSV(csvText) {
       var rows = [];
       var currentRow = [];
@@ -473,6 +553,60 @@ db["Team_End_Season"] = db["Team_End_Season"].replace({"ARI": "UTA"})</code></pr
       });
     }
 
+    function compareValues(a, b) {
+      var cleanA = String(a || "").replace(/[$,%]/g, "").trim();
+      var cleanB = String(b || "").replace(/[$,%]/g, "").trim();
+
+      var numA = Number(cleanA);
+      var numB = Number(cleanB);
+
+      if (!isNaN(numA) && !isNaN(numB) && cleanA !== "" && cleanB !== "") {
+        return numA - numB;
+      }
+
+      return String(a || "").localeCompare(String(b || ""), undefined, {
+        numeric: true,
+        sensitivity: "base"
+      });
+    }
+
+    function applySearchFilterAndSort() {
+      var searchInput = document.getElementById("player-table-search");
+      var searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : "";
+
+      var headers = playerTableRows[0];
+      var dataRows = playerTableRows.slice(1);
+
+      filteredRows = dataRows.filter(function(row) {
+        var matchesSearch = row.some(function(cell) {
+          return String(cell || "").toLowerCase().includes(searchTerm);
+        });
+
+        var matchesColumnFilters = headers.every(function(_, index) {
+          var filterValue = columnFilters[index];
+
+          if (!filterValue) {
+            return true;
+          }
+
+          return String(row[index] || "")
+            .toLowerCase()
+            .includes(filterValue.toLowerCase());
+        });
+
+        return matchesSearch && matchesColumnFilters;
+      });
+
+      if (sortColumnIndex !== null) {
+        filteredRows.sort(function(a, b) {
+          var result = compareValues(a[sortColumnIndex], b[sortColumnIndex]);
+          return sortDirection === "asc" ? result : -result;
+        });
+      }
+
+      renderPlayerTable([headers].concat(filteredRows));
+    }
+
     function renderPlayerTable(rows) {
       var container = document.getElementById("player-table-container");
 
@@ -485,14 +619,56 @@ db["Team_End_Season"] = db["Team_End_Season"].replace({"ARI": "UTA"})</code></pr
       var thead = document.createElement("thead");
       var tbody = document.createElement("tbody");
       var headerRow = document.createElement("tr");
+      var filterRow = document.createElement("tr");
 
-      rows[0].forEach(function(header) {
+      filterRow.className = "filter-row";
+
+      rows[0].forEach(function(header, index) {
         var th = document.createElement("th");
-        th.textContent = header;
+        var sortIndicator = "";
+
+        if (sortColumnIndex === index) {
+          sortIndicator = sortDirection === "asc" ? " ▲" : " ▼";
+        }
+
+        th.textContent = header + sortIndicator;
+
+        th.addEventListener("click", function() {
+          if (sortColumnIndex === index) {
+            sortDirection = sortDirection === "asc" ? "desc" : "asc";
+          } else {
+            sortColumnIndex = index;
+            sortDirection = "asc";
+          }
+
+          applySearchFilterAndSort();
+        });
+
         headerRow.appendChild(th);
+
+        var filterTh = document.createElement("th");
+        var filterInput = document.createElement("input");
+
+        filterInput.className = "column-filter";
+        filterInput.type = "text";
+        filterInput.placeholder = "Filter";
+        filterInput.value = columnFilters[index] || "";
+
+        filterInput.addEventListener("click", function(event) {
+          event.stopPropagation();
+        });
+
+        filterInput.addEventListener("input", function() {
+          columnFilters[index] = filterInput.value;
+          applySearchFilterAndSort();
+        });
+
+        filterTh.appendChild(filterInput);
+        filterRow.appendChild(filterTh);
       });
 
       thead.appendChild(headerRow);
+      thead.appendChild(filterRow);
 
       rows.slice(1).forEach(function(row) {
         var tr = document.createElement("tr");
@@ -508,6 +684,7 @@ db["Team_End_Season"] = db["Team_End_Season"].replace({"ARI": "UTA"})</code></pr
 
       table.appendChild(thead);
       table.appendChild(tbody);
+
       container.innerHTML = "";
       container.appendChild(table);
     }
@@ -521,7 +698,20 @@ db["Team_End_Season"] = db["Team_End_Season"].replace({"ARI": "UTA"})</code></pr
         return response.text();
       })
       .then(function(csvText) {
-        renderPlayerTable(parseCSV(csvText));
+        playerTableRows = parseCSV(csvText);
+
+        if (!playerTableRows.length) {
+          document.getElementById("player-table-container").innerHTML =
+            '<p class="table-error">No data found in data/WEBSITE.csv.</p>';
+          return;
+        }
+
+        filteredRows = playerTableRows.slice(1);
+        renderPlayerTable(playerTableRows);
+
+        document
+          .getElementById("player-table-search")
+          .addEventListener("input", applySearchFilterAndSort);
       })
       .catch(function(error) {
         document.getElementById("player-table-container").innerHTML =
@@ -531,5 +721,4 @@ db["Team_End_Season"] = db["Team_End_Season"].replace({"ARI": "UTA"})</code></pr
       });
   </script>
 </body>
-</html>
 </html>
