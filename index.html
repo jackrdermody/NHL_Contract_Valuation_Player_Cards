@@ -18,12 +18,14 @@
     header {
       padding: 40px 60px 20px;
       text-align: center;
+      background-color: #05080d;
     }
 
     h1 {
-      margin-bottom: 5px;
+      margin-bottom: 8px;
       font-size: 42px;
       letter-spacing: 1px;
+      text-transform: uppercase;
     }
 
     h2 {
@@ -31,11 +33,20 @@
       margin-top: 50px;
       border-bottom: 1px solid #2f3b4a;
       padding-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    h3 {
+      color: #c9d4e2;
+      margin-top: 30px;
     }
 
     .subtitle {
       color: #c9d4e2;
       font-size: 18px;
+      max-width: 900px;
+      margin: 0 auto;
     }
 
     main {
@@ -53,6 +64,31 @@
       overflow-x: auto;
     }
 
+    .card {
+      background: #0b111a;
+      border: 1px solid #243447;
+      border-radius: 10px;
+      padding: 22px;
+      margin-top: 20px;
+    }
+
+    ul {
+      padding-left: 24px;
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    a {
+      color: #5dade2;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
     pre {
       background: #0b111a;
       border: 1px solid #243447;
@@ -67,8 +103,12 @@
       font-size: 14px;
     }
 
-    a {
-      color: #5dade2;
+    footer {
+      text-align: center;
+      color: #8b98a8;
+      padding: 30px;
+      border-top: 1px solid #243447;
+      margin-top: 40px;
     }
   </style>
 </head>
@@ -77,7 +117,9 @@
   <header>
     <h1>NHL Contract Valuation Dashboard</h1>
     <div class="subtitle">
-      Player contract valuation and prediction dashboard built with Python, machine learning, and Tableau.
+      Player contract valuation and prediction dashboard built with Python,
+      machine learning, Tableau, PuckPedia contract data, and Evolving Hockey
+      player performance data.
     </div>
   </header>
 
@@ -89,32 +131,135 @@
     </div>
 
     <h2>Project Overview</h2>
+
+    <div class="card">
+      <p>
+        This project estimates NHL player contract value by combining player
+        demographics, contract information, traditional statistics, usage metrics,
+        and advanced GAR-based performance metrics.
+      </p>
+
+      <p>
+        The final Tableau dashboard presents a player-level contract card that
+        compares observed contract outcomes against model-based expectations.
+        It is designed to make player evaluation, contract efficiency, and
+        comparable-player analysis easier to explore interactively.
+      </p>
+    </div>
+
+    <h2>Methodology</h2>
+
+    <div class="card">
+      <p>
+        The Python workflow begins by cleaning and preprocessing contract data
+        from PuckPedia and player performance data from Evolving Hockey. Player
+        names, season fields, position indicators, height, weight, shooting hand,
+        team abbreviations, and contract-year features are standardized before
+        the datasets are merged.
+      </p>
+
+      <p>
+        After preprocessing, the project engineers modeling features related to
+        player demographics, scoring production, time on ice, special teams usage,
+        position, contract year, and GAR components. These features are then used
+        to estimate future contract value and compare predicted outcomes against
+        actual contract results.
+      </p>
+
+      <h3>Key Feature Groups</h3>
+
+      <ul>
+        <li>Player demographics: age, height, weight, shooting hand, position</li>
+        <li>Traditional statistics: games played, goals, assists, points, penalties</li>
+        <li>Usage statistics: 5v5 TOI, power-play TOI, penalty-kill TOI</li>
+        <li>Advanced metrics: GAR components and player value indicators</li>
+        <li>Contract data: AAV, contract length, cap percentage, signing season</li>
+      </ul>
+    </div>
+
+    <h2>Project Files</h2>
+
+    <div class="card">
+      <p>
+        The full Python notebook and input data files are available below.
+      </p>
+
+      <ul>
+        <li>
+          <a href="notebooks/Dermody_NHL_Contract_Valuation.ipynb">
+            Full Python Notebook
+          </a>
+        </li>
+        <li>
+          <a href="data/PuckPediaData.xlsx">
+            PuckPedia Contract Data
+          </a>
+        </li>
+        <li>
+          <a href="data/EvolvingHockeyData.xlsx">
+            Evolving Hockey Player Data
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <h2>Sample Feature Engineering Code</h2>
+
     <p>
-      This project estimates NHL player contract value using player demographics,
-      traditional statistics, advanced GAR components, and contract information.
-      The final dashboard compares actual contract outcomes against model predictions.
+      The full workflow is included in the notebook above. A small sample of the
+      feature engineering process is shown below.
     </p>
 
-    <h2>Python Code</h2>
-    <p>
-      You can either paste your main code below or link to your Python files in this repository.
-    </p>
-
-    <pre><code>
-# Example placeholder
-import pandas as pd
+    <pre><code>import pandas as pd
 import numpy as np
 
-# Load data
-df = pd.read_csv("your_data.csv")
+# Load input files
+puckpedia_df = pd.read_excel("../data/PuckPediaData.xlsx")
+evolving_hockey_df = pd.read_excel("../data/EvolvingHockeyData.xlsx")
 
-# Feature engineering, modeling, and prediction code here
-    </code></pre>
+# Recreate full player name
+db["Full_Name"] = db["First_Name"] + " " + db["Last_Name"]
 
-    <h2>Repository Links</h2>
-    <p>
-      Add links here to your full Python scripts, notebooks, data dictionary, or README.
-    </p>
+# Create position label from binary position columns
+db["Position"] = np.select(
+    [
+        (db["Pos_C"] == 1) & (db["Pos_D"] == 0),
+        (db["Pos_C"] == 0) & (db["Pos_D"] == 1),
+        (db["Pos_C"] == 0) & (db["Pos_D"] == 0),
+    ],
+    ["Center", "Defenseman", "Winger"],
+    default="Unknown"
+)
+
+# Get player's final team of the season
+db["Team_End_Season"] = (
+    db["Team"]
+    .str.split("/")
+    .str[-1]
+    .str.replace(r"[^\w]", "", regex=True)
+)
+
+# Handle Arizona-to-Utah franchise change
+db["Team_End_Season"] = db["Team_End_Season"].replace({"ARI": "UTA"})</code></pre>
+
+    <h2>Tools Used</h2>
+
+    <div class="card">
+      <ul>
+        <li>Python</li>
+        <li>pandas</li>
+        <li>NumPy</li>
+        <li>scikit-learn</li>
+        <li>statsmodels</li>
+        <li>Tableau Public</li>
+        <li>GitHub Pages</li>
+      </ul>
+    </div>
+
   </main>
+
+  <footer>
+    NHL Contract Valuation Project
+  </footer>
 </body>
 </html>
