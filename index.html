@@ -98,6 +98,56 @@
       margin-top: 20px;
     }
 
+    .table-card {
+      background: #0b111a;
+      border: 1px solid #243447;
+      border-radius: 10px;
+      padding: 16px;
+      margin-top: 20px;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 900px;
+      color: #f5f7fa;
+      font-size: 14px;
+    }
+
+    th,
+    td {
+      border: 1px solid #243447;
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #102033;
+      color: #5dade2;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    tr:nth-child(even) {
+      background: #08101a;
+    }
+
+    .table-note {
+      color: #c9d4e2;
+      margin-top: 0;
+      margin-bottom: 12px;
+    }
+
+    .table-error {
+      color: #ffb3b3;
+      margin: 0;
+    }
+
     ul {
       padding-left: 24px;
     }
@@ -161,6 +211,40 @@
   </header>
 
   <main>
+    <h2>Project Overview</h2>
+
+    <div class="card">
+      <p>
+        The objective of this project was to develop a predictive modeling
+        framework that estimates NHL player contract value using historical
+        contract data, player performance metrics, demographic variables, and
+        advanced player-value statistics.
+      </p>
+
+      <p>
+        NHL contracts are complex financial decisions influenced by scoring
+        production, age, position, usage, team context, and prior performance.
+        This project quantified those relationships using Python-based data
+        preparation, feature engineering, statistical modeling, and interactive
+        Tableau dashboarding.
+      </p>
+
+      <p>
+        The analysis combined publicly available contract data from PuckPedia
+        with player statistics and advanced performance data from Evolving Hockey.
+        The workflow focused on cleaning and standardizing player records,
+        engineering contract-year features, merging performance and contract
+        datasets, and developing models to estimate future contract outcomes.
+      </p>
+
+      <p>
+        The final deliverable is an interactive Tableau dashboard that presents
+        a player-level contract valuation card, allowing users to compare actual
+        contract outcomes against model-based expectations and explore the
+        statistical profile behind each player.
+      </p>
+    </div>
+
     <h2>Interactive Tableau Dashboard</h2>
 
     <div class="dashboard">
@@ -205,38 +289,16 @@
       </script>
     </div>
 
-    <h2>Project Overview</h2>
+    <h2>Player Table</h2>
 
-    <div class="card">
-      <p>
-        The objective of this project was to develop a predictive modeling
-        framework that estimates NHL player contract value using historical
-        contract data, player performance metrics, demographic variables, and
-        advanced player-value statistics.
+    <div class="table-card">
+      <p class="table-note">
+        Player-level data loaded from <code>data/WEBSITE.csv</code>.
       </p>
 
-      <p>
-        NHL contracts are complex financial decisions influenced by scoring
-        production, age, position, usage, team context, and prior performance.
-        This project quantified those relationships using Python-based data
-        preparation, feature engineering, statistical modeling, and interactive
-        Tableau dashboarding.
-      </p>
-
-      <p>
-        The analysis combined publicly available contract data from PuckPedia
-        with player statistics and advanced performance data from Evolving Hockey.
-        The workflow focused on cleaning and standardizing player records,
-        engineering contract-year features, merging performance and contract
-        datasets, and developing models to estimate future contract outcomes.
-      </p>
-
-      <p>
-        The final deliverable is an interactive Tableau dashboard that presents
-        a player-level contract valuation card, allowing users to compare actual
-        contract outcomes against model-based expectations and explore the
-        statistical profile behind each player.
-      </p>
+      <div id="player-table-container">
+        <p>Loading player table...</p>
+      </div>
     </div>
 
     <h2>Methodology</h2>
@@ -317,9 +379,9 @@ db["Full_Name"] = db["First_Name"] + " " + db["Last_Name"]
 # Create position label from binary position columns
 db["Position"] = np.select(
     [
-        (db["Pos_C"] == 1) & (db["Pos_D"] == 0),
-        (db["Pos_C"] == 0) & (db["Pos_D"] == 1),
-        (db["Pos_C"] == 0) & (db["Pos_D"] == 0),
+        (db["Pos_C"] == 1) &amp; (db["Pos_D"] == 0),
+        (db["Pos_C"] == 0) &amp; (db["Pos_D"] == 1),
+        (db["Pos_C"] == 0) &amp; (db["Pos_D"] == 0),
     ],
     ["Center", "Defenseman", "Winger"],
     default="Unknown"
@@ -365,5 +427,109 @@ db["Team_End_Season"] = db["Team_End_Season"].replace({"ARI": "UTA"})</code></pr
   <footer>
     NHL Contract Valuation Project | Jack Dermody
   </footer>
+
+  <script>
+    function parseCSV(csvText) {
+      var rows = [];
+      var currentRow = [];
+      var currentValue = "";
+      var insideQuotes = false;
+
+      for (var i = 0; i < csvText.length; i++) {
+        var char = csvText[i];
+        var nextChar = csvText[i + 1];
+
+        if (char === '"' && insideQuotes && nextChar === '"') {
+          currentValue += '"';
+          i++;
+        } else if (char === '"') {
+          insideQuotes = !insideQuotes;
+        } else if (char === "," && !insideQuotes) {
+          currentRow.push(currentValue);
+          currentValue = "";
+        } else if ((char === "\n" || char === "\r") && !insideQuotes) {
+          if (char === "\r" && nextChar === "\n") {
+            i++;
+          }
+
+          currentRow.push(currentValue);
+          rows.push(currentRow);
+          currentRow = [];
+          currentValue = "";
+        } else {
+          currentValue += char;
+        }
+      }
+
+      if (currentValue || currentRow.length) {
+        currentRow.push(currentValue);
+        rows.push(currentRow);
+      }
+
+      return rows.filter(function(row) {
+        return row.some(function(cell) {
+          return cell.trim() !== "";
+        });
+      });
+    }
+
+    function renderPlayerTable(rows) {
+      var container = document.getElementById("player-table-container");
+
+      if (!rows.length) {
+        container.innerHTML = '<p class="table-error">No data found in data/WEBSITE.csv.</p>';
+        return;
+      }
+
+      var table = document.createElement("table");
+      var thead = document.createElement("thead");
+      var tbody = document.createElement("tbody");
+      var headerRow = document.createElement("tr");
+
+      rows[0].forEach(function(header) {
+        var th = document.createElement("th");
+        th.textContent = header;
+        headerRow.appendChild(th);
+      });
+
+      thead.appendChild(headerRow);
+
+      rows.slice(1).forEach(function(row) {
+        var tr = document.createElement("tr");
+
+        rows[0].forEach(function(_, index) {
+          var td = document.createElement("td");
+          td.textContent = row[index] || "";
+          tr.appendChild(td);
+        });
+
+        tbody.appendChild(tr);
+      });
+
+      table.appendChild(thead);
+      table.appendChild(tbody);
+      container.innerHTML = "";
+      container.appendChild(table);
+    }
+
+    fetch("data/WEBSITE.csv")
+      .then(function(response) {
+        if (!response.ok) {
+          throw new Error("Unable to load data/WEBSITE.csv");
+        }
+
+        return response.text();
+      })
+      .then(function(csvText) {
+        renderPlayerTable(parseCSV(csvText));
+      })
+      .catch(function(error) {
+        document.getElementById("player-table-container").innerHTML =
+          '<p class="table-error">Player table could not be loaded. Make sure WEBSITE.csv is saved at data/WEBSITE.csv in your repository.</p>';
+
+        console.error(error);
+      });
+  </script>
 </body>
+</html>
 </html>
